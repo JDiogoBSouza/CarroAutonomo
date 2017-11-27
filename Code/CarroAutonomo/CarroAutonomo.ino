@@ -12,9 +12,9 @@
 #define VCCLDR1     A1    // Pino A1 - Alimenta o LDR1.
 #define LEDLDR1     A2    // Pino A2 - Alimenta o LED que emite luz para o LDR1.
 
-#define LDR2        A3    // Pino A3 - Entrada do LDR2.
+#define LDR2        A5    // Pino A3 - Entrada do LDR2.
 #define VCCLDR2     A4    // Pino A4 - Alimenta o LDR2.
-#define LEDLDR2     A5    // Pino A5 - Alimenta o LED que emite luz para o LDR2.
+#define LEDLDR2     A3    // Pino A5 - Alimenta o LED que emite luz para o LDR2.
 
 #define FAROIS      2     // Pino 2 - Alimenta os LEDs dos Farois dianteiros.
 
@@ -23,12 +23,12 @@
 #define MOTORDIANTEIROA 8   // Pino 8 - Controla a direção do motor dianteiro.
 #define MOTORDIANTEIROB 9   // Pino 9 - Controla a direção do motor dianteiro.
 
-#define VELOCIDADEMOTOR 10    // Pino 10 - Controla a velocidade do motor traseiro.
-#define MOTORTRASEIROA  11    // Pino 11 - Controla a direção do motor traseiro.
+#define VELOCIDADEMOTOR 11    // Pino 10 - Controla a velocidade do motor traseiro.
+#define MOTORTRASEIROA  10    // Pino 11 - Controla a direção do motor traseiro.
 #define MOTORTRASEIROB  12    // Pino 12 - Controla a direção do motor traseiro.
 
 #define ECHO        4   // Pino 4 - Echo do Sensor UltraSonico.
-#define TRIGGER     5   // Pino 5 - Trigger do Sensor UltraSonico.
+#define TRIGGER     5   //ino 5 - Trigger do Sensor UltraSonico.
 
 // Constantes para controle de posição do servo.
 #define ESQUERDA  175   // 175 graus - "Esquerda"
@@ -36,14 +36,14 @@
 #define DIREITA   20    // 20 graus  - "Direita"
 
 // Constantes com valores utilizados no programa
-#define DISTANCIALDR      700   // Valor da distancia minima de um obstaculo "visto" pelo LDR.
-#define DISTANCIAULTRA    80    // Valor da distancia minima de um obstaculo "visto" pelo Ultrasom.
+#define DISTANCIALDR      300   // Valor da distancia minima de um obstaculo "visto" pelo LDR.
+#define DISTANCIAULTRA    70   // Valor da distancia minima de um obstaculo "visto" pelo Ultrasom.
 
-#define VELOCIDADE        180   // Valor da velocidade padrão em que o carro se movimenta.
+#define VELOCIDADE        200   // Valor da velocidade padrão em que o carro se movimenta.
 
 #define TEMPOSERVO        1000  // Tempo em ms que se deve esperar para o servo deixar o ultrasom na posição correta para leitura.
-#define TEMPOCURVA        800   // Tempo em ms que o carro leva para dar uma curva a direita/esquerda.
-#define TEMPOBRECAGEM     150   // Valor da duração da "brecagem" do carro.
+#define TEMPOCURVA        45  // Tempo em ms que o carro leva para dar uma curva a direita/esquerda.
+#define TEMPOBRECAGEM     30   // Valor da duração da "brecagem" do carro.
 
 #define ESQ      -1     //
 #define NONE      0     //
@@ -61,11 +61,12 @@ Ultrasonic ultrasonic(ECHO, TRIGGER); // Variável do Sensor UltraSonico.
 int sentidoAtual = 0;
 
 int tempoAndar = 1000;
+bool fazendoCurva = false;
+int curvaAtual = 0;
 
 void setup ()
 {
   servo.attach(SERVO);  // Inicializa o servo na porta escolhida.
-  servo.write(CENTRO);  // Inicia motor posição central.
 
   // LDR1
   pinMode(LDR1, INPUT);   
@@ -76,6 +77,11 @@ void setup ()
   pinMode(LDR2, INPUT);
   pinMode(VCCLDR2, OUTPUT);
   pinMode(LEDLDR2, OUTPUT);
+
+  /*digitalWrite(VCCLDR1, HIGH);
+  digitalWrite(LEDLDR1, HIGH);
+  digitalWrite(VCCLDR2, HIGH);
+  digitalWrite(LEDLDR2, HIGH);*/
 
   // Motor Traseiro
   pinMode(MOTORTRASEIROA, OUTPUT); 
@@ -88,27 +94,33 @@ void setup ()
 
   // Farois
   pinMode(FAROIS, OUTPUT);
-
+  
   stop_back(10);
+  servo.write(CENTRO);  // Inicia motor posição central.
  
   Serial.begin(9600);
+  piscaFarois();
+  estadoFarol(true);
+  
+  delay(2000);
+  randomSeed(analogRead(A6));
 }
 
 int lado;
 
 void loop()
-{
+{  
+  // Testes LDR
+  /*int a = analogRead(LDR1);
+  int b = analogRead(LDR2);
   
-  while( verificaFrente() )
-  {
-    anda_frente(VELOCIDADE, 1);
-  }
-  
-  Serial.println("Brecou");
-  breakes();
+  Serial.print("LDR1 = " );
+  Serial.println(a);
+  Serial.println();
+  Serial.print("LDR2 = " );
+  Serial.println(b);*/
 
-  Serial.print("LADO: ");
-  Serial.println(lado);
+  anda_frente();
   
   lado = NONE;
   
@@ -118,23 +130,180 @@ void loop()
     escolheCaminho( lado ); 
   }
 }
+// Função para fazer o carro andar para frente.
+void anda_frente(int Speed, int tempo)
+{  
+  int i = 0;
+  
+  analogWrite(VELOCIDADEMOTOR, Speed);
+  digitalWrite(MOTORTRASEIROA, LOW);
+  digitalWrite(MOTORTRASEIROB, HIGH);
+
+  while( i < tempo/2 )
+  {
+    if( verificaFrente() )
+    {
+      if(Speed != 255)
+        sentidoAtual = 1;
+    
+      Serial.print( "I= " );
+      Serial.println( i );
+      i++;
+      
+      delay(1);
+    }
+    else if( fazendoCurva )
+    {
+      centro_direcao();
+      breakes(1);
+      anda_tras(VELOCIDADE, 30);
+
+      return;
+    }
+    else
+    {
+      break;
+    }
+  }
+
+
+  if( i > 0 && Speed != 255)
+  {
+    Serial.println("BREAKIIIIIIING");
+    breakes(1);
+  }
+  else
+  {
+    Serial.println("STOPIIIIIIING");
+    stop_back(100);
+  }
+    
+}
+
+// Função para fazer o carro andar para frente.
+void anda_frente()
+{    
+  bool andou = false;
+
+  sentidoAtual = 1;
+  
+  analogWrite(VELOCIDADEMOTOR, VELOCIDADE);
+  digitalWrite(MOTORTRASEIROA, LOW);
+  digitalWrite(MOTORTRASEIROB, HIGH);
+  
+  while( verificaFrente() )
+  {
+    Serial.println("FREEEEEENTE");
+    andou = true;
+  }
+  
+  if( andou )
+  {
+    Serial.println("brake frente");
+    breakes(1);
+  }
+  else
+    stop_back(100);
+}
+
+// Função para fazer o carro dar ré.
+// @param Speed : Velocidade que se deseja que o carro ande.
+// @param tempo : Tempo que o carro deve andar.
+// @return : Caso o retorno seja true, o Carro conseguiu andar para tras o tempo determinado sem obstaculos,
+// caso contrario o carro encontrou algum obstaculo antes ou depois de começar a andar e "brecou".
+bool anda_tras(int Speed, int tempo)
+{  
+  delay(5);   // Para garantir um tempo para ligar os leds e ldrs.
+  
+  // Liga os LDRs e LEDs para verificar se o carro não vai bater.
+  onOffLdr(true);
+    
+  int a = 5;//analogRead(LDR1);
+  int b = 5;//analogRead(LDR2);
+      
+  //delay(200);
+
+  if( !(a >= DISTANCIALDR) )
+  {
+    if(Speed != 255)
+      sentidoAtual = -1;
+  
+    analogWrite(VELOCIDADEMOTOR, VELOCIDADE);
+    digitalWrite(MOTORTRASEIROA, HIGH);
+    digitalWrite(MOTORTRASEIROB, LOW);
+  
+    for( int i = 0; i < tempo; i++ )
+    {
+      a = 5;//analogRead(LDR1);
+      b = analogRead(LDR2);
+  
+      if( a >= DISTANCIALDR )
+      {
+        Serial.println("Encontrou um obstaculo enquanto dava Re");
+        breakes(-1);
+        onOffLdr(false);
+        return false;
+      }
+  
+      Serial.print("I = ");
+      Serial.print(i);
+      Serial.print("A = ");
+      Serial.print(a);
+      Serial.print(" B = ");
+      Serial.println(b);
+  
+      delay(1);
+    }
+  }
+  else
+  {
+    Serial.println("Nao conseguiu iniciar a Re");
+    onOffLdr(false);
+    return false;
+  }
+  
+  // Desliga os LDRs e LEDs.
+  breakes(-1);
+  onOffLdr(false);
+
+  return true;
+}
+
+// Função para fazer o carro frear, enviando um pulso contrario para o motor traseiro.
+void breakes( int sentido )
+{
+  if (sentido == 1) 
+  {
+    anda_tras(255, TEMPOBRECAGEM);
+    stop_back(0.03*TEMPOBRECAGEM);
+  }
+  else if (sentido == -1)
+  {
+    anda_frente(255, 10);
+    stop_back(0.03*10);
+  }
+
+  sentidoAtual = 0;
+}
 
 void escolheCaminho(int dir)
 {
   if( dir == 1 )
   {
     Serial.println( "Curva a direita" );
+    direita_direcao();
     fazerCurva( true );
   }
   else if( dir == -1 )
   {
     Serial.println( "Curva a esquerda" );
+    esquerda_direcao();
     fazerCurva( false );
   }
   else
   {
     Serial.println( "Dando Re" );
-    anda_tras(VELOCIDADE, tempoAndar);
+    anda_tras(VELOCIDADE, 100);
   }
 }
 
@@ -151,10 +320,34 @@ bool verificaFrente()
   Serial.print("Centro - Distancia em cm: ");
   Serial.println(leitura);
 
-  if( leitura > DISTANCIAULTRA )
-    return true;
+  if( fazendoCurva == true )
+  {
+    Serial.println( "FAZENDO CURVA" );
+    if( leitura > 30 )
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
   else
-    return false;
+  {  
+    
+    Serial.println( "INDO RETO" );
+    
+    if( leitura > DISTANCIAULTRA )
+    {
+      Serial.println( "leitura > DISTANCIAULTRA" );
+      return true;
+    }
+    else
+    {
+      Serial.println( "leitura < DISTANCIAULTRA" );
+      return false;
+    }
+  }
 }
 
 int verificaLados()
@@ -191,7 +384,17 @@ int verificaLados()
   
   if( leituraEsq > DISTANCIAULTRA && leituraDir > DISTANCIAULTRA )
   {
-    return ESQ;  // TODO: Escolher uma direção de forma randomica.
+    int randNumber = random(300);
+
+    if( randNumber % 2 == 0 )
+    {
+      return DIR;
+    }
+    else
+    {
+      return ESQ;
+    }
+    
   }
   else if( leituraEsq > DISTANCIAULTRA )
   {
@@ -228,18 +431,23 @@ void fazerCurva( bool direcao )
     Serial.println( "Fazendo curva para a Direita" );
     direita_direcao();
     delay(40);
+    curvaAtual = 1;
   }
   else
   {
     Serial.println( "Fazendo curva para a Esquerda" );
     esquerda_direcao();
     delay(40);
+    curvaAtual = -1;
   }
 
+  fazendoCurva = true;
   anda_frente(VELOCIDADE, TEMPOCURVA);
-  breakes();
+  breakes(1);
   
   centro_direcao();
+  curvaAtual = 0;
+  fazendoCurva = false;
   Serial.println("Acabou a Curva");
   delay(40);
 }
@@ -269,10 +477,13 @@ void estadoFarol(bool estado)
 // Função para fazer o carro parar por um determinado tempo.
 void stop_back(int tempo)
 { 
-  digitalWrite(MOTORTRASEIROA, LOW);
-  digitalWrite(MOTORTRASEIROB, LOW);
-  delay(tempo);
+    analogWrite(VELOCIDADEMOTOR, 0);
+    digitalWrite(MOTORTRASEIROA, LOW);
+    digitalWrite(MOTORTRASEIROB, LOW);
+    delay(tempo);
+  
 }
+
 
 // Função para deixar direcao centralizada.
 void centro_direcao()
@@ -283,91 +494,17 @@ void centro_direcao()
 
 // Função para deixar direcao virada para a direita.
 void direita_direcao()
-{ 
-  digitalWrite(MOTORDIANTEIROA, HIGH);
-  digitalWrite(MOTORDIANTEIROB, LOW);
+{  
+  digitalWrite(MOTORDIANTEIROA, LOW);
+  digitalWrite(MOTORDIANTEIROB, HIGH); 
 }     
 
 // Função para deixar direcao virada para a esquerda.
 void esquerda_direcao()
-{
-  digitalWrite(MOTORDIANTEIROA, LOW);
-  digitalWrite(MOTORDIANTEIROB, HIGH);
-} 
-
-// Função para fazer o carro andar para frente.
-bool anda_frente(int Speed, int tempo)
-{
-  sentidoAtual = 1;
-  
-  analogWrite(VELOCIDADEMOTOR, Speed);
-  digitalWrite(MOTORTRASEIROA, LOW);
-  digitalWrite(MOTORTRASEIROB, HIGH);
-  
-  delay(tempo);
-}
-
-// Função para fazer o carro dar ré.
-// @param Speed : Velocidade que se deseja que o carro ande.
-// @param tempo : Tempo que o carro deve andar.
-// @return : Caso o retorno seja true, o Carro conseguiu andar para tras o tempo determinado sem obstaculos,
-// caso contrario o carro encontrou algum obstaculo antes ou depois de começar a andar e "brecou".
-bool anda_tras(int Speed, int tempo)
 {  
-  delay(5);   // Para garantir um tempo para ligar os leds e ldrs.
-  
-  // Liga os LDRs e LEDs para verificar se o carro não vai bater.
-  onOffLdr(true);
-    
-  int a = analogRead(LDR1);
-  int b = analogRead(LDR2);
-
-  if( !(a > DISTANCIALDR || b > DISTANCIALDR) )
-  {
-    sentidoAtual = -1;
-  
-    digitalWrite(MOTORTRASEIROA, HIGH);
-    digitalWrite(MOTORTRASEIROB, LOW);
-  
-    analogWrite(VELOCIDADEMOTOR, Speed);
-  
-    for( int i = 0; i < tempo; i++ )
-    {
-      a = analogRead(LDR1);
-      b = analogRead(LDR2);
-  
-      if( a > DISTANCIALDR || b > DISTANCIALDR )
-      {
-        Serial.println("Encontrou um obstaculo enquanto dava Re");
-        breakes();
-        sentidoAtual = 0;
-        onOffLdr(false);
-        return false;
-      }
-  
-      /*Serial.print("A = ");
-      Serial.print(a);
-      Serial.print(" B = ");
-      Serial.println(b);*/
-  
-      delay(1);
-    }
-  }
-  else
-  {
-    Serial.println("Nao conseguiu iniciar a Re");
-    sentidoAtual = 0;
-    onOffLdr(false);
-    return false;
-  }
-  
-  // Desliga os LDRs e LEDs.
-  breakes();
-  sentidoAtual = 0;
-  onOffLdr(false);
-
-  return true;
-}
+  digitalWrite(MOTORDIANTEIROA, HIGH);
+  digitalWrite(MOTORDIANTEIROB, LOW);
+} 
 
 void onOffLdr(bool liga)
 {
@@ -389,19 +526,3 @@ void onOffLdr(bool liga)
   }
 }
 
-// Função para fazer o carro frear, enviando um pulso contrario para o motor traseiro.
-void breakes()
-{
-  if (sentidoAtual == 1) 
-  {
-    anda_tras(255, TEMPOBRECAGEM);
-    stop_back(TEMPOBRECAGEM - 50);
-  }
-  else if (sentidoAtual == -1)
-  {
-    anda_frente(255, TEMPOBRECAGEM);
-    stop_back(TEMPOBRECAGEM - 50);
-  }
-
-  sentidoAtual = 0;
-}
