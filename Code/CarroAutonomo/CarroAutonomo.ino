@@ -10,11 +10,7 @@
 
 #define LDR1        A0    // Pino A0 - Entrada do LDR1.
 #define VCCLDR1     A1    // Pino A1 - Alimenta o LDR1.
-#define LEDLDR1     A2    // Pino A2 - Alimenta o LED que emite luz para o LDR1.
-
-#define LDR2        A5    // Pino A3 - Entrada do LDR2.
-#define VCCLDR2     A4    // Pino A4 - Alimenta o LDR2.
-#define LEDLDR2     A3    // Pino A5 - Alimenta o LED que emite luz para o LDR2.
+#define LEDLDR1     A2    // Pino A2 - Alimenta o LED que emite luz para o LDR1
 
 #define FAROIS      2     // Pino 2 - Alimenta os LEDs dos Farois dianteiros.
 
@@ -36,8 +32,8 @@
 #define DIREITA   20    // 20 graus  - "Direita"
 
 // Constantes com valores utilizados no programa
-#define DISTANCIALDR      300   // Valor da distancia minima de um obstaculo "visto" pelo LDR.
-#define DISTANCIAULTRA    70   // Valor da distancia minima de um obstaculo "visto" pelo Ultrasom.
+#define DISTANCIALDR      530   // Valor da distancia minima de um obstaculo "visto" pelo LDR.
+#define DISTANCIAULTRA    60   // Valor da distancia minima de um obstaculo "visto" pelo Ultrasom.
 
 #define VELOCIDADE        200   // Valor da velocidade padrão em que o carro se movimenta.
 
@@ -73,11 +69,6 @@ void setup ()
   pinMode(VCCLDR1, OUTPUT);
   pinMode(LEDLDR1, OUTPUT);
 
-  // LDR2
-  pinMode(LDR2, INPUT);
-  pinMode(VCCLDR2, OUTPUT);
-  pinMode(LEDLDR2, OUTPUT);
-
   /*digitalWrite(VCCLDR1, HIGH);
   digitalWrite(LEDLDR1, HIGH);
   digitalWrite(VCCLDR2, HIGH);
@@ -99,27 +90,22 @@ void setup ()
   servo.write(CENTRO);  // Inicia motor posição central.
  
   Serial.begin(9600);
-  piscaFarois();
-  estadoFarol(true);
+  /*piscaFarois();
+  estadoFarol(true);*/
   
   delay(2000);
   randomSeed(analogRead(A6));
+  onOffLdr(true);
 }
 
 int lado;
 
 void loop()
 {  
-  // Testes LDR
-  /*int a = analogRead(LDR1);
-  int b = analogRead(LDR2);
   
-  Serial.print("LDR1 = " );
-  Serial.println(a);
-  Serial.println();
-  Serial.print("LDR2 = " );
-  Serial.println(b);*/
-
+  /*int a = analogRead(LDR1);
+  Serial.print("LDR: ");
+  Serial.println(a);*/
   anda_frente();
   
   lado = NONE;
@@ -130,6 +116,7 @@ void loop()
     escolheCaminho( lado ); 
   }
 }
+
 // Função para fazer o carro andar para frente.
 void anda_frente(int Speed, int tempo)
 {  
@@ -146,8 +133,8 @@ void anda_frente(int Speed, int tempo)
       if(Speed != 255)
         sentidoAtual = 1;
     
-      Serial.print( "I= " );
-      Serial.println( i );
+      //Serial.print( "I= " );
+      //Serial.println( i );
       i++;
       
       delay(1);
@@ -156,7 +143,9 @@ void anda_frente(int Speed, int tempo)
     {
       centro_direcao();
       breakes(1);
-      anda_tras(VELOCIDADE, 30);
+      //anda_tras(VELOCIDADE, 100);
+
+      fazendoCurva = false;
 
       return;
     }
@@ -218,8 +207,7 @@ bool anda_tras(int Speed, int tempo)
   // Liga os LDRs e LEDs para verificar se o carro não vai bater.
   onOffLdr(true);
     
-  int a = 5;//analogRead(LDR1);
-  int b = 5;//analogRead(LDR2);
+  int a = analogRead(LDR1);
       
   //delay(200);
 
@@ -234,8 +222,7 @@ bool anda_tras(int Speed, int tempo)
   
     for( int i = 0; i < tempo; i++ )
     {
-      a = 5;//analogRead(LDR1);
-      b = analogRead(LDR2);
+      a = analogRead(LDR1);
   
       if( a >= DISTANCIALDR )
       {
@@ -249,8 +236,6 @@ bool anda_tras(int Speed, int tempo)
       Serial.print(i);
       Serial.print("A = ");
       Serial.print(a);
-      Serial.print(" B = ");
-      Serial.println(b);
   
       delay(1);
     }
@@ -275,7 +260,7 @@ void breakes( int sentido )
   if (sentido == 1) 
   {
     anda_tras(255, TEMPOBRECAGEM);
-    stop_back(0.03*TEMPOBRECAGEM);
+    stop_back(0.03*TEMPOBRECAGEM);    // 30% do tempo de brecagem
   }
   else if (sentido == -1)
   {
@@ -303,7 +288,7 @@ void escolheCaminho(int dir)
   else
   {
     Serial.println( "Dando Re" );
-    anda_tras(VELOCIDADE, 100);
+    anda_tras(VELOCIDADE, 50);
   }
 }
 
@@ -384,16 +369,16 @@ int verificaLados()
   
   if( leituraEsq > DISTANCIAULTRA && leituraDir > DISTANCIAULTRA )
   {
-    int randNumber = random(300);
+    //int randNumber = random(300);
 
-    if( randNumber % 2 == 0 )
-    {
+    //if( randNumber % 2 == 0 )
+    //{
       return DIR;
-    }
+    /*}
     else
     {
       return ESQ;
-    }
+    }*/
     
   }
   else if( leituraEsq > DISTANCIAULTRA )
@@ -512,17 +497,11 @@ void onOffLdr(bool liga)
   {
     digitalWrite(VCCLDR1, HIGH);  // Liga o LDR1
     digitalWrite(LEDLDR1, HIGH);  // Liga o LED do LDR1
-  
-    digitalWrite(VCCLDR2, HIGH);  // Liga o LDR2
-    digitalWrite(LEDLDR2, HIGH);  // Liga o LED do LDR2
   }
   else
   {
     digitalWrite(VCCLDR1, LOW);  // Liga o LDR1
     digitalWrite(LEDLDR1, LOW);  // Liga o LED do LDR1
-  
-    digitalWrite(VCCLDR2, LOW);  // Liga o LDR2
-    digitalWrite(LEDLDR2, LOW);  // Liga o LED do LDR2
   }
 }
 
